@@ -1,7 +1,6 @@
 services:
   fraud-api-1: &fraud-api
-    build: .
-    image: fraud-api
+  image: ghcr.io/arthursfares/rinha-backend-2026:latest
     mem_limit: 150m
     cpus: 0.45
 #    environment:
