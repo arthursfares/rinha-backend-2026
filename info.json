@@ -1,6 +1,6 @@
 {
     "participants": ["Arthur Fares"],
-    "social": ["https://github.com/arthursfares"],
+    "social": ["https://github.com/arthursfares", "https://linkedin.com/in/arthursfares"],
     "source-code-repo": "https://github.com/arthursfares/rinha-backend-2026",
     "stack": ["go", "nginx"],
     "open_to_work": true
