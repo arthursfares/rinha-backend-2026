@@ -9,7 +9,7 @@ import (
 )
 
 type scoreResponse struct {
-	Approved   string  `json:"approved"`
+	Approved   bool  `json:"approved"`
 	FraudScore float64 `json:"fraud_score"`
 }
 
@@ -53,10 +53,10 @@ func postFraudScore(referenceDataset *internals.RefData) http.HandlerFunc {
 				fraudsCount++
 			}
 		}
-		approved := "true"
+		approved := true
 		fraudScore := float64(fraudsCount) / 3
 		if fraudsCount >= 2 {
-			approved = "false"
+			approved = false
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(scoreResponse{
