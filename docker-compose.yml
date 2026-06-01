@@ -1,0 +1,32 @@
+services:
+  fraud-api-1: &fraud-api
+    build: .
+    image: fraud-api
+    mem_limit: 150m
+    cpus: 0.45
+#    environment:
+#      - GOMAXPROCS=2
+#      - GOMEMLIMIT=130MiB
+    networks:
+      - fraud-net
+
+  fraud-api-2:
+    <<: *fraud-api
+
+  nginx:
+    image: nginx:alpine
+    depends_on:
+      - fraud-api-1
+      - fraud-api-2
+    ports:
+      - "9999:9999"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    mem_limit: 50m
+    cpus: 0.10
+    networks:
+      - fraud-net
+
+networks:
+  fraud-net:
+    driver: bridge
