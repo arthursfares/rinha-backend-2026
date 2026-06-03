@@ -97,7 +97,7 @@ func postFraudScore(referenceDataset *internals.RefData) http.HandlerFunc {
 		for i, v := range normBlock {
 			query[i] = internals.Quantize(v)
 		}
-		distancesMin3 := internals.FindTop3IVF(query[:], referenceDataset)
+		distancesMin3 := internals.FindTop3(query[:], referenceDataset)
 		fraudsCount := 0
 		for _, res := range distancesMin3 {
 			if res.Label == 1 {
