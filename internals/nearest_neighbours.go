@@ -11,16 +11,32 @@ type LabeledScore struct {
 	Label	uint8
 }
 
+//func sqDist16(q, r *[STRIDE]int8) int32 {
+//	var sum int32
+//	for i:= 0; i < DIM; i++ {
+//		d := int32(q[i]) - int32(r[i])
+//		sum += d * d
+//	}
+//	return sum
+//}
+
 func sqDistQuantized(query []int8, refOffset int, ref []int8) int32 {
-	q := query[:DIM]
-	r := ref[refOffset : refOffset+DIM]
-	var sum int32
-	for i := 0; i < DIM; i++ {
-		d := int32(q[i]) - int32(r[i])
-		sum += d * d
-	}
-	return sum
+	//q := (*[STRIDE]int8)(query[:STRIDE])
+	//r := (*[STRIDE]int8)(ref[refOffset : refOffset+STRIDE])
+	//return sqDist16(q, r)
+	return sqDistSIMD(&query[0], &ref[refOffset])
 }
+
+//func sqDistQuantized(query []int8, refOffset int, ref []int8) int32 {
+//	q := query[:DIM]
+//	r := ref[refOffset : refOffset+DIM]
+//	var sum int32
+//	for i := 0; i < DIM; i++ {
+//		d := int32(q[i]) - int32(r[i])
+//		sum += d * d
+//	}
+//	return sum
+//}
 
 //type Top3Finder func(query []int8, ref *RefData) [3]LabeledScore
 
@@ -33,7 +49,7 @@ func FindTop3(query []int8, ref *RefData) [3]LabeledScore {
 		{Score: math.MaxInt32},
 	}
 	for i := 0; i < ref.count; i++ {
-		distance := sqDistQuantized(query, i*DIM, ref.vectors)
+		distance := sqDistQuantized(query, i*STRIDE, ref.vectors)
 		// skip if it can't beat the worst of the top 3
 		if distance >= top[2].Score { continue }
 		// insert at the worst slot, then bubble up to keep ascending order
@@ -60,7 +76,7 @@ func FindTop3IVF(query []int8, ref *RefData) [3]LabeledScore {
 		probes[i].dist = math.MaxInt32
 	}
 	for c := 0; c < NUM_CLUSTERS; c++ {
-		d := sqDistQuantized(query, c*DIM, ref.centroids)
+		d := sqDistQuantized(query, c*STRIDE, ref.centroids)
 		if d >= probes[NPROBE-1].dist { continue }
 		probes[NPROBE-1] = probe{d, c}
 		// bubble up
@@ -78,7 +94,7 @@ func FindTop3IVF(query []int8, ref *RefData) [3]LabeledScore {
 		start := int(ref.offsets[p.id])
 		end := int(ref.offsets[p.id+1])
 		for i := start; i < end; i++ {
-			d := sqDistQuantized(query, i*DIM, ref.vectors)
+			d := sqDistQuantized(query, i*STRIDE, ref.vectors)
 			if d >= distancesMin3[2].Score { continue }
 			distancesMin3[2] = LabeledScore{d, ref.labels[i]}
 			if distancesMin3[2].Score < distancesMin3[1].Score {
