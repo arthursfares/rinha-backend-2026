@@ -5,7 +5,7 @@ services:
     cpus: 0.45
     environment:
       - GOMAXPROCS=2
-      - GOMEMLIMIT=130MiB
+      - GOMEMLIMIT=140MiB
     networks:
       - fraud-net
 
