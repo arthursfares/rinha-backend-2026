@@ -35,7 +35,13 @@ func clamp(val float64) float64 {
 func NormalizeValues(e Event) [DIM]float64 {
 	amount := clamp(e.Transaction.Amount / maxAmount)
 	installments := clamp(float64(e.Transaction.Installments) / maxInstallments)
-	amount_vs_avg := clamp((e.Transaction.Amount/e.Customer.AvgAmount) / amountVsAvgRatio)
+	
+	ratio := 0.0
+	if e.Customer.AvgAmount > 0 {
+		ratio = e.Transaction.Amount / e.Customer.AvgAmount
+	}
+	amount_vs_avg := clamp(ratio / amountVsAvgRatio)
+	
 	hour_of_day := float64(e.Transaction.RequestedAt.Hour()) / 23.0
 	
 	standardWeekday := int(e.Transaction.RequestedAt.Weekday())
