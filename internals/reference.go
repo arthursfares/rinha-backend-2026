@@ -10,12 +10,13 @@ import (
 const (
 	DIM				= 14
 	NUM_CLUSTERS	= 1024
+	STRIDE			= 16    // padded storage width
 )
 
 type RefData struct {
-	centroids	[]int8		// NUM_CLUSTERS * DIM
+	centroids	[]int8		// NUM_CLUSTERS * STRIDE
 	offsets		[]uint32	// NUMCLUSTERS + 1
-	vectors		[]int8		// count * DIM, in cluster order
+	vectors		[]int8		// count * STRIDE, in cluster order
 	labels		[]uint8		// count, in cluster order
 	count		int
 }
@@ -51,18 +52,20 @@ func LoadBinary(path string) (*RefData, error) {
 	}
 
 	rd := &RefData{
-		centroids: 	make([]int8, int(k)*DIM),
+		centroids: 	make([]int8, int(k)*STRIDE),
 		offsets:   	make([]uint32, int(k)+1),
-		vectors:	make([]int8, int(count)*DIM),
+		vectors:	make([]int8, int(count)*STRIDE),
 		labels:		make([]uint8, count),
 		count:		int(count),
 	}
 
 	cbuf := make([]byte, int(k)*DIM)
 	io.ReadFull(f, cbuf)
-	for i, b := range cbuf {
-		rd.centroids[i] = int8(b)
-	}
+	for c := 0; c < int(k); c++ {
+		for j := 0; j < DIM; j++ {
+			rd.centroids[c*STRIDE+j] = int8(cbuf[c*DIM+j])
+		}
+	} 
 
 	binary.Read(f, binary.LittleEndian, rd.offsets)
 
@@ -72,7 +75,7 @@ func LoadBinary(path string) (*RefData, error) {
 			return nil, err
 		}
 		for j := 0; j < DIM; j++ {
-			rd.vectors[i*DIM+j] = int8(buf[j])
+			rd.vectors[i*STRIDE+j] = int8(buf[j])
 		}
 		rd.labels[i] = buf[DIM]
 	}
