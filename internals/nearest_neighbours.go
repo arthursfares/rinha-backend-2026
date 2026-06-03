@@ -3,7 +3,7 @@ package internals
 import "math"
 
 const (
-	NPROBE = 4  // how many clusters to scan per query
+	NPROBE = 2  // how many clusters to scan per query
 )
 
 type LabeledScore struct {
