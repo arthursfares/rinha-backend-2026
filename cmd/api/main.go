@@ -28,7 +28,7 @@ var bufPool = sync.Pool{
 }
 
 func main() {
-	referenceDataset, err := internals.LoadBinary("references.bin")
+	referenceDataset, err := internals.LoadBinaryFloat("references.bin")
 	if err != nil {
 		log.Fatalf("failed to load reference dataset: %v", err)
 	}
@@ -70,7 +70,7 @@ func getReady(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ready"}`))
 }
 
-func postFraudScore(referenceDataset *internals.RefData) http.HandlerFunc {
+func postFraudScore(referenceDataset *internals.RefDataFloat) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bp := bufPool.Get().(*[]byte)
 		buf := (*bp)[:0]
@@ -93,22 +93,15 @@ func postFraudScore(referenceDataset *internals.RefData) http.HandlerFunc {
 		bufPool.Put(bp)
 
 		normBlock := internals.NormalizeValues(testBlock)
-		var query [internals.STRIDE]int8	// 16-wide (14 and 15 stay zero)
-		for i, v := range normBlock {
-			query[i] = internals.Quantize(v)
-		}
-		distancesMin3 := internals.FindTop3(query[:], referenceDataset)
+		distancesMin5 := internals.FindTop5IVFFloat(normBlock[:], referenceDataset)
 		fraudsCount := 0
-		for _, res := range distancesMin3 {
+		for _, res := range distancesMin5 {
 			if res.Label == 1 {
 				fraudsCount++
 			}
 		}
-		approved := true
-		fraudScore := float64(fraudsCount) / 3
-		if fraudsCount >= 2 {
-			approved = false
-		}
+		fraudScore := float64(fraudsCount) / 5
+		approved := fraudScore < 0.6 
 
 		out, err := sonicAPI.Marshal(scoreResponse{
 			Approved:	approved,
