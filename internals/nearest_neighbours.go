@@ -38,34 +38,27 @@ func sqDistQuantized(query []int8, refOffset int, ref []int8) int32 {
 //	return sum
 //}
 
-//type Top3Finder func(query []int8, ref *RefData) [3]LabeledScore
-
-// returns the 3 nearest reference vectors to query,
-// sorted ascended by squared distance
-func FindTop3(query []int8, ref *RefData) [3]LabeledScore {
-	top := [3]LabeledScore{
-		{Score: math.MaxInt32},
-		{Score: math.MaxInt32},
-		{Score: math.MaxInt32},
+func FindTop5(query []int8, ref *RefData) [5]LabeledScore {
+	top := [5]LabeledScore{
+		{Score: math.MaxInt32}, {Score: math.MaxInt32}, {Score: math.MaxInt32},
+		{Score: math.MaxInt32}, {Score: math.MaxInt32},
 	}
 	for i := 0; i < ref.count; i++ {
 		distance := sqDistQuantized(query, i*STRIDE, ref.vectors)
-		// skip if it can't beat the worst of the top 3
-		if distance >= top[2].Score { continue }
-		// insert at the worst slot, then bubble up to keep ascending order
-		top[2] = LabeledScore{distance, ref.labels[i]}
-        if top[2].Score < top[1].Score {
-            top[1], top[2] = top[2], top[1]
-        }
-        if top[1].Score < top[0].Score {
-            top[0], top[1] = top[1], top[0]
-        }
+		if distance >= top[4].Score {
+			continue
+		}
+		j := 4
+		for j > 0 && distance < top[j-1].Score {
+			top[j] = top[j-1]
+			j--
+		}
+		top[j] = LabeledScore{distance, ref.labels[i]}
 	}
 	return top
 }
 
-
-func FindTop3IVF(query []int8, ref *RefData) [3]LabeledScore {
+func FindTop5IVF(query []int8, ref *RefData) [5]LabeledScore {
 	// find NPROBE closest centroids
 	type probe struct {
 		dist 	int32
@@ -85,25 +78,23 @@ func FindTop3IVF(query []int8, ref *RefData) [3]LabeledScore {
 		}
 	}
 	// scan only those clusters
-	distancesMin3 := [3]LabeledScore{
-		{Score: math.MaxInt32},
-		{Score: math.MaxInt32},
-		{Score: math.MaxInt32},
+	top := [5]LabeledScore{
+		{Score: math.MaxInt32}, {Score: math.MaxInt32}, {Score: math.MaxInt32},
+		{Score: math.MaxInt32}, {Score: math.MaxInt32},
 	}
 	for _, p := range probes {
 		start := int(ref.offsets[p.id])
 		end := int(ref.offsets[p.id+1])
 		for i := start; i < end; i++ {
 			d := sqDistQuantized(query, i*STRIDE, ref.vectors)
-			if d >= distancesMin3[2].Score { continue }
-			distancesMin3[2] = LabeledScore{d, ref.labels[i]}
-			if distancesMin3[2].Score < distancesMin3[1].Score {
-				distancesMin3[1], distancesMin3[2] = distancesMin3[2], distancesMin3[1]
+			if d >= top[4].Score { continue }
+			j := 4
+			for j > 0 && d < top[j-1].Score {
+				top[j] = top[j-1]
+				j--
 			}
-			if distancesMin3[1].Score < distancesMin3[0].Score {
-				distancesMin3[0], distancesMin3[1] = distancesMin3[1], distancesMin3[0]
-			}
+			top[j] = LabeledScore{d, ref.labels[i]}
 		}
 	}
-	return distancesMin3
+	return top
 }
