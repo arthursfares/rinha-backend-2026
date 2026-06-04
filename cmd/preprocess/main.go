@@ -1,13 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"compress/gzip"
 	"encoding/binary"
 	"encoding/json"
 	"io"
 	"log"
-	"os"
+	"math"
 	"math/rand"
+	"os"
 	"sync"
 )
 
@@ -23,11 +25,11 @@ const (
 	MAX_ITER		= 15
 )
 
-func quantize(v float64) int8 {
-	if v < 0 { return -128 }
-	if v >= 1 { return 127 }
-	return int8(v * 127)
-}
+// func quantize(v float64) int8 {
+// 	if v < 0 { return -128 }
+// 	if v >= 1 { return 127 }
+// 	return int8(v * 127)
+// }
 
 func sqDistF(a, b []float32) float32 {
 	var s float32
@@ -109,34 +111,46 @@ func assignAll(vecs []float32, n int, centroids []float32) []uint16 {
 	return assignments
 }
 
+
+// - centroids as float32 (fast SIMD cluster selection at query time)
+// - vectors as int16 scaled by 32767 (precision ~0.00003, half the bytes
+// of float32 → ~87 MB on disk, ~96 MB in RAM vs 192 MB for float32)
 func writeBinary(path string, data []Config, vecs []float32, order []int,
 	centroids []float32, offsets []uint32, n int) {
 	f, _ := os.Create(path)
 	defer f.Close()
-	f.Write([]byte("IVFR"))
-	binary.Write(f, binary.LittleEndian, uint8(DIM))
-	binary.Write(f, binary.LittleEndian, uint32(n))
-	binary.Write(f, binary.LittleEndian, uint16(NUM_CLUSTERS))
-	// quantized centroids
-	cbuf := make([]byte, NUM_CLUSTERS*DIM)
-	for i := 0; i < NUM_CLUSTERS*DIM; i++ {
-		cbuf[i] = byte(quantize(float64(centroids[i])))
-	}
-	f.Write(cbuf)
+	w := bufio.NewWriterSize(f, 4<<20)
+	defer w.Flush()
+
+	w.Write([]byte("IVFS"))
+	binary.Write(w, binary.LittleEndian, uint8(DIM))
+	binary.Write(w, binary.LittleEndian, uint32(n))
+	binary.Write(w, binary.LittleEndian, uint16(NUM_CLUSTERS))
+
+	// centroids as float32 (only 14 KB, worth the precision for cluster search)
+	binary.Write(w, binary.LittleEndian, centroids[:NUM_CLUSTERS*DIM])
+
 	// offsets
-	binary.Write(f, binary.LittleEndian, offsets)
-	// vectors + labels in cluster order
-	buf := make([]byte, DIM+1)
+	binary.Write(w, binary.LittleEndian, offsets)
+
+	// vectors as int16 + 1 byte label; DIM*2+1 = 29 bytes per entry
+	buf := make([]byte, DIM*2+1)
 	for _, idx := range order {
 		for j := 0; j < DIM; j++ {
-			buf[j] = byte(quantize(float64(vecs[idx*DIM+j])))
+			v := vecs[idx*DIM+j] * 32767.0
+			if v > 32767 {
+				v = 32767
+			} else if v < -32767 {
+				v = -32767
+			}
+			binary.LittleEndian.PutUint16(buf[j*2:], uint16(int16(math.Round(float64(v)))))
 		}
 		if data[idx].Label == "fraud" {
-			buf[DIM] = 1
+			buf[DIM*2] = 1
 		} else {
-			buf[DIM] = 0
+			buf[DIM*2] = 0
 		}
-		f.Write(buf)
+		w.Write(buf)
 	}
 }
 
